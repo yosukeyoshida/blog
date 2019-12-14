@@ -1,0 +1,55 @@
+/*================================*
+             nav bar
+=================================*/
+.nav-title{
+  color: #243250;
+}
+/*================================*
+               body
+=================================*/
+.post-title {
+  font-size: 2rem;
+  color: #243250;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #243250;
+}
+
+h1{
+  padding-top: 40px;
+  font-size: 1.8rem;
+}
+
+h2 {
+  font-size: 1.4rem;
+}
+
+h2,h3,h4{
+  padding-top:20px;
+}
+
+.highlight { background-color: #272822; }
+pre code { font-size: 85%; }
+
+.post > h1:not(.post-title){
+  border-bottom: #243250 solid 0.1px;
+}
+
+.post-line{
+  color: #002551;
+}
+
+.catalogue-title {
+  color: #002551;
+  font-size: 1.6rem; 
+}
+
+.post > p{
+  line-height: 1.7;
+}

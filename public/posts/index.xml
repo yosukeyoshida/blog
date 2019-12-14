@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Posts on yosukeyoshida</title>
+    <link>https://yosukeyoshida.netlify.com/posts/</link>
+    <description>Recent content in Posts on yosukeyoshida</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>ja</language>
+    <lastBuildDate>Fri, 20 Dec 2019 00:00:00 +0900</lastBuildDate>
+    
+	<atom:link href="https://yosukeyoshida.netlify.com/posts/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>非負値行列因子分解を用いた決済分析</title>
+      <link>https://yosukeyoshida.netlify.com/posts/nmf/</link>
+      <pubDate>Fri, 20 Dec 2019 00:00:00 +0900</pubDate>
+      
+      <guid>https://yosukeyoshida.netlify.com/posts/nmf/</guid>
+      <description>&lt;p&gt;非負値行列因子分解 (non-negative matrix factorization; NMF) は, 非負値行列を非負値行列の積に分解するという数学的にはシンプルでありながらその応用範囲は画像や文書, 信号処理と幅広く適用できることで知られ, 次元削減やクラスタリング, レコメンデーションに活用することができる。&lt;br&gt;
+はじめに NMF の理論について簡単に説明した後, 実際の決済データに対してNMFを適用してみる。&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

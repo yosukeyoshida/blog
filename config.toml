@@ -1,0 +1,14 @@
+baseURL = "https://yosukeyoshida.netlify.com/"
+languageCode = "ja"
+defaultContentLanguage = "ja"
+title = "yosukeyoshida"
+theme = "tale"
+pygmentsCodeFences = true
+pygmentsUseClasses = true
+
+[params]
+katex = true
+css = ["css/custom.css", "css/syntax.css"]
+
+[Author]
+name = "yosukeyoshida"

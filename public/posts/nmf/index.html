@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="twitter:card" content="summary" />
+		<meta name="og:title" content="非負値行列因子分解を用いた決済分析" />
+		<meta name="og:description" content="非負値行列因子分解 (non-negative matrix factorization; NMF) は, 非負値行列を非負値行列の積に分解するという数学的にはシンプルでありながらその応用範囲は画像や文書, 信号処理と幅広く適用できることで知られ, 次元削減やクラスタリング, レコメンデーションに活用することができる。
+はじめに NMF の理論について簡単に説明した後, 実際の決済データに対してNMFを適用してみる。" />
+		<meta name="og:image" content="https://yosukeyoshida.netlify.com/images/eyecatch.png" />
+		<meta name="twitter:url" content="https://yosukeyoshida.netlify.com/posts/nmf/" />
+
+		<title>非負値行列因子分解を用いた決済分析 &middot; yosukeyoshida</title>
+
+		
+  		<link rel="stylesheet" href="/css/style.css">
+		<link rel="stylesheet" href="/css/fonts.css">
+		<link rel="stylesheet" href="/css/custom.css">
+		<link rel="stylesheet" href="/css/syntax.css">
+		
+		<link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+		<link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+		<link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+
+		
+		<link href="" rel="alternate" type="application/rss+xml" title="yosukeyoshida" />
+	</head>
+
+    <body>
+        		<nav class="nav">
+			<div class="nav-container">
+				<a href="/">
+					<h2 class="nav-title">yosukeyoshida</h2>
+				</a>
+				<ul>
+    
+    
+</ul>
+			</div>
+		</nav>
+
+        
+
+<main>
+	<div class="post">
+		<div class="post-info">
+    <span></span>
+        
+        <br>
+        <span>&nbsp;</span><time datetime="2019-12-20 00:00:00 &#43;0900 JST">December 20, 2019</time>
+</div>
+		<h1 class="post-title">非負値行列因子分解を用いた決済分析</h1>
+<div class="post-line"></div>
+
+		
+
+		<p>非負値行列因子分解 (non-negative matrix factorization; NMF) は, 非負値行列を非負値行列の積に分解するという数学的にはシンプルでありながらその応用範囲は画像や文書, 信号処理と幅広く適用できることで知られ, 次元削減やクラスタリング, レコメンデーションに活用することができる。<br>
+はじめに NMF の理論について簡単に説明した後, 実際の決済データに対してNMFを適用してみる。</p>
+<p>この記事は <a href="https://adventar.org/calendars/4386">カンム Advent Calendar 2019</a> 20日目の記事です。</p>
+<h1 id="heading">行列分解</h1>
+<p>任意の行列を複数の行列の積に分解することを行列分解と呼ぶ。行列分解には様々な手法があり, 特異値分解やそれを利用した主成分分析がよく知られている。<br>
+行列を分解をすることで何が嬉しいのか。以下簡単な例で説明する。</p>
+<h2 id="heading1">購買データの例</h2>
+<p>行列 $X$ はスーパーで4人の客が5種類の商品 {にんじん, たまねぎ, じゃがいも, みかん, りんご} のうち何を購入したか示すデータである。行列 $X$ の各行が客に対応し, 各列が購入した商品に対応している。
+例えば1人目の客は {にんじん, たまねぎ} を購入し, 3人目の客は {みかん, りんご} を購入している。</p>
+<p>$$
+X = \left[
+\begin{array}{rrr}
+1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 \\ 1 &amp; 0 &amp; 1 &amp; 0 &amp; 0 \\ 0 &amp; 0 &amp; 0 &amp; 1 &amp; 1 \\ 0 &amp; 0 &amp; 0 &amp; 0 &amp; 1
+\end{array}
+\right]
+$$</p>
+<p>各商品を野菜カテゴリ {にんじん, たまねぎ, じゃがいも}, 果物カテゴリ {みかん, りんご} と2つのカテゴリに分けてみるとそれぞれのカテゴリ内の商品は一緒に購入されるが異なるカテゴリの商品を一緒に購入されることはない。<br>
+ここで特異値分解を用いると行列 $X$ は以下のように行列 $W, H$ の積に分解される。</p>
+<p>$$ \begin{aligned}
+X &amp;= \left[
+\begin{array}{rrr}
+1 &amp; 1 &amp; 0 &amp; 0 &amp; 0 \\ 1 &amp; 0 &amp; 1 &amp; 0 &amp; 0 \\ 0 &amp; 0 &amp; 0 &amp; 1 &amp; 1 \\ 0 &amp; 0 &amp; 0 &amp; 0 &amp; 1
+\end{array}
+\right] \\
+&amp;= \left[
+\begin{array}{rrr}
+0.71 &amp; 0 &amp; -0.71 &amp; 0 \\ 0.71 &amp; 0 &amp; 0.71 &amp; 0 \\ 0 &amp; 0.85 &amp; 0 &amp; -0.53 \\ 0 &amp; 0.53 &amp; 0 &amp; 0.85
+\end{array}
+\right]
+\left[
+\begin{array}{rrr}
+1.41 &amp; 0.71 &amp; 0.71 &amp; 0 &amp; 0 \\ 0 &amp; 0 &amp; 0 &amp; 0.85 &amp; 1.38 \\ 0 &amp; -0.71 &amp; 0.71 &amp; 0 &amp; 0 \\ 0 &amp; 0 &amp; 0 &amp; -0.53 &amp; 0.32
+\end{array}
+\right] \\
+&amp;= WH
+\end{aligned}
+$$</p>
+<p>特異値分解は Python で以下のように求められる。</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="c1"># 元の行列 X</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="p">[</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="p">,</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="p">,</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="p">,</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="p">]</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+<span class="c1"># [[1 1 0 0 0]</span>
+<span class="c1">#  [1 0 1 0 0]</span>
+<span class="c1">#  [0 0 0 1 1]</span>
+<span class="c1">#  [0 0 0 0 1]]</span>
+
+<span class="c1"># 特異値分解</span>
+<span class="n">u</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">vh</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">full_matrices</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">u</span>
+<span class="n">h</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="err">@</span> <span class="n">vh</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="p">)</span>
+<span class="c1"># [[ 0.71  0.   -0.71  0.  ]</span>
+<span class="c1">#  [ 0.71  0.    0.71  0.  ]</span>
+<span class="c1">#  [ 0.    0.85  0.   -0.53]</span>
+<span class="c1">#  [ 0.    0.53  0.    0.85]]</span>
+<span class="k">print</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="p">)</span>
+<span class="c1"># [[ 1.41  0.71  0.71  0.    0.  ]</span>
+<span class="c1">#  [ 0.   -0.   -0.    0.85  1.38]</span>
+<span class="c1">#  [ 0.   -0.71  0.71  0.    0.  ]</span>
+<span class="c1">#  [ 0.   -0.   -0.   -0.53  0.32]]</span>
+
+<span class="c1"># W, H の積をとることで元の行列Xが復元される</span>
+<span class="n">X_r</span> <span class="o">=</span> <span class="p">(</span><span class="n">w</span> <span class="err">@</span> <span class="n">h</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">X_r</span><span class="p">)</span>
+<span class="c1"># [[ 1.  1. -0.  0.  0.]</span>
+<span class="c1">#  [ 1.  0.  1.  0.  0.]</span>
+<span class="c1">#  [ 0. -0. -0.  1.  1.]</span>
+<span class="c1">#  [ 0. -0. -0. -0.  1.]]</span>
+</code></pre></div><p>まず行列 $H$ をみると, 1行目には {にんじん, たまねぎ, じゃがいも} という野菜カテゴリの特徴をもつベクトルが, 2行目には {みかん, りんご} という果物カテゴリの特徴をもつベクトルが抽出されていることが分かる。<br>
+つまり行列 $H$ は購入された商品の間の潜在的な特徴 (基底) を捉えたものとなっており, 各要素は基底に対する商品の重み付けとなっている。</p>
+<p>行列 $H$ の各基底ベクトルを $h_i$ , 行列 $W$ の要素を $w_{ij}$ とすると 行列 $X$ の行ベクトル $x_i$ は基底ベクトルの線形結合で表わすことができる。</p>
+<p>$$
+x_i = \sum_j w_{ij}h_j
+$$</p>
+<p>つまり行列 $W$ は各基底の係数行列となっており, それぞれの客に対する特徴の重み付けとなっている。<br>
+行列 $W$ の1列目と2列目をみると1人目の客と2人目の客は野菜カテゴリの基底に対する係数が大きく果物カテゴリの基底に対する係数が0となっている。3人目の客と4人目の客はその逆に果物カテゴリの係数が大きく野菜カテゴリは0となっている。野菜もしくは果物を購入した客であるかはこの2つの基底があれば判断ができそうである。<br>
+そこで係数行列 $W$ の1,2列目と基底行列 $H$ の1,2行目だけを抜き出した行列を掛け合わせると以下のようになる。</p>
+<p>$$
+\left[
+\begin{array}{rrr}
+0.71 &amp; 0 \\ 0.71 &amp; 0 \\ 0 &amp; 0.85 \\ 0 &amp; 0.53
+\end{array}
+\right]
+\left[
+\begin{array}{rrr}
+1.41 &amp; 0.71 &amp; 0.71 &amp; 0 &amp; 0 \\ 0 &amp; 0 &amp; 0 &amp; 0.85 &amp; 1.38
+\end{array}
+\right]
+= \left[
+\begin{array}{rrr}
+1 &amp; 0.5 &amp; 0.5 &amp; 0 &amp; 0 \\ 1 &amp; 0.5 &amp; 0.5 &amp; 0 &amp; 0 \\ 0 &amp; 0 &amp; 0 &amp; 0.72 &amp; 1.17 \\ 0 &amp; 0 &amp; 0 &amp; 0.45 &amp; 0.72
+\end{array}
+\right]
+$$</p>
+<p>掛け合わされた行列を見ると1,2番目の客は野菜を購入した客, 3,4番目の客は果物を購入した客という元の行列 $X$ の構造が復元されていることがわかる。<br>
+これは5次元の商品の要素で客の購買データを表現していたものを2次元の特徴で捉えられるように次元削減していることになる。商品の細かい違いは無視して野菜や果物を購入する客という潜在的な情報を抽出している。</p>
+<h1 id="heading2">非負値行列因子分解</h1>
+<p>非負値行列因子分解 (non-negative matrix factorization; NMF) は, 行列分解において非負値の制約を入れたものである。実世界では非負値となるデータが多く, 非負値を構成する要素もまた非負値であるべきという考えに基づいている。さきほどの購買データにおいて野菜の基底に対する係数が負であるというのは不自然であり解釈が難しい。<br>
+また非負値制約の副次的な効果として分割した行列がスパース (疎) となりやすく, 個々のデータを少数の基底ベクトルで近似できるようになる。</p>
+<h2 id="nmf">NMFのアルゴリズム</h2>
+<p>NMF では非負値行列を2つの非負値行列の積に分解する。これは非負値制約のもとで元の行列と分解された行列の積による近似誤差を目的関数として最小化する非線形の最適化問題になる。</p>
+<p>いま $N$ 個の非負値 K 次元データベクトルを $y_1, y_2,\ldots, y_N$ とし, 基底ベクトルを $h_1, h_2,\ldots, h_M$, 結合係数を $w_{1,n},\ldots,w_{m,n}$ とした場合に以下のように近似したい。</p>
+<p>$$
+\tag{1} y_n \simeq \sum_{m=1}^M h_m w_{m,n} \hspace{10pt} (n = 1,\ldots,N)
+$$</p>
+<p>データベクトルを並べた行列を $Y = [y_1,\ldots,y_N] = (y_{k,n})_{K \times N}$ とし, 基底ベクトルを並べた行列を $H = [h_1,\ldots,h_M] = (h_{k,m})_{K \times M}$, 結合係数 $w_{m,m}$  を 要素とした行列を  $W = (w_{m,n})_{M \times N}$ とすると,<br>
+$$
+Y \simeq HW
+$$
+と表せる。表記の分かりやすさのため購買データの例のときとは異なり分割前の行列 $Y$ と 基底行列 $H$ が転置していることに注意。さきほどは分割前の行列はユーザが行ベクトルとなっていたがここでは列ベクトルとなっている。</p>
+<p>NMFでは $Y$ と $HW$ の近似誤差基準に応じて異なる最適化問題に帰着する。<a href="#heading8">参考文献 [1]</a> にはユークリッド距離とKLダイバージェンスによる誤差関数が示されているがここではユークリッド距離 (二乗誤差) を基準としたNMFアルゴリズムの導出を示す。</p>
+<p>frobeniusノルム (行列の要素の二乗和) を取ることで二乗誤差 $D(H,W)$ を以下のように定義する。</p>
+<p>$$ \begin{aligned}
+\tag{2} D(H,W) &amp;= \|Y-HW\|^2 \\
+&amp;= \sum_{k,n} |y_{k,n} - \sum_m h_{k,m}w_{m,n}|^2 \\
+&amp;= \sum_{k,n} (y_{k,n}^2 -2y_{k,n}\sum_m h_{k,m}w_{m,n} + (\sum_m h_{k,m}w_{m,n})^2) \\
+&amp;= \sum_{k,n} (y_{k,n}^2 -2y_{k,n}x_{k,n} + x_{k,n}^2)
+\end{aligned}
+$$</p>
+<p>ただし, $x_{k,n} = \sum_m h_{k,m}w_{m,n}$ とおいている。</p>
+<p>ここで $y_{k,n}^2$ は定数であるので, $D(H, W)$ を最小化するためには $\sum_{k,n} (-2y_{k,n}x_{k,n} + x_{k,n}^2)$ を最小化すればよい。
+ここで $x_{k,n}^2$ は凸関数であるから, $\lambda_{k,m,n} &gt; 0, \hspace{5pt} \sum_m \lambda_{k,m,n} = 1$ となる $\lambda_{k,m,n}$ を導入するとJensenの不等式 <a href="#1-jensen-">[1]</a> より,</p>
+<p>$$ \begin{aligned}
+\tag{3} x_{k,n}^2 &amp;= (\sum_m h_{k,m}w_{m,n})^2 \\
+&amp;= (\sum_m \lambda_{k,m,n} \frac{h_{k,m}w_{m,n}}{\lambda_{k,m,n}})^2 \\
+&amp;\leq \sum_m \lambda_{k,m,n}(\frac{h_{k,m} w_{m,n}}{\lambda_{k,m,n}})^2
+\end{aligned}
+$$</p>
+<p>が成立する。特に等号が成立するのは $\frac{h_{k,1}w_{1,n}}{\lambda_{k,1,n}} = \cdots = \frac{h_{k,M}w_{M,n}}{\lambda_{k,M,n}}$ のとき, すなわち,</p>
+<p>$$
+\tag{4} \lambda_{k,m,n} = \frac{h_{k,m}w_{m,n}}{x_{k,n}}
+$$</p>
+<p>のときである。ここでのポイントは和の二乗から二乗の和に変換できていることで後に示すように行列 $H, W$ の要素を個別に最適化することができる。</p>
+<p>(2) において $x_{k,n}^2$ の項を (3) で置き換えた関数を $G(H,W,\lambda)$ とすると,</p>
+<p>$$ \begin{aligned}
+\tag{5} D(H,W) &amp;= \sum_{k,n} (y_{k,n}^2 -2y_{k,n}x_{k,n} + x_{k,n}^2) \\
+&amp;\leq \sum_{k,n} (y_{k,n}^2 - 2y_{k,n}\sum_m h_{k,m}w_{m,n} + \sum_m \frac{h_{k,m}^2 w_{m,n}^2}{\lambda_{k,m,n}}) = G(H,W,\lambda) \\
+D(H,W) &amp;= \min_{\lambda}{G(H,W,\lambda)}
+\end{aligned}
+$$</p>
+<p>となり, これは $D(H,W)$ の補助関数 <a href="#2-">[2]</a> の要件を満たすので $G(H,W,\lambda)$ に対して以下の手続きを反復的に行うことで $D(H,W)$ を単調に減少させていくことができる。</p>
+<p>$$
+\tag{6} \lambda \leftarrow \argmin_\lambda G(H,W,\lambda)
+$$
+$$
+\tag{7} H \leftarrow \argmin_H G(H,W,\lambda)
+$$
+$$
+\tag{8} W \leftarrow \argmin_W G(H,W,\lambda)
+$$</p>
+<p>$G(H,W,\lambda)$ を最小化する $\lambda_{k,m,n}$ は (4) である。$G(H,W,\lambda)$ を最小化する $h_{k,m}, w_{m,n}$ についてはそれぞれの偏微分の値をゼロとして解析的に解けばよいので,</p>
+<p>$$ \begin{aligned}
+\frac{\partial G}{\partial h_{k,m}} &amp;= \sum_n(-2y_{k,n}w_{m,n} + \frac{2h_{k,m}w_{m,n}^2}{\lambda_{k,m,n}}) = 0 \\
+\tag{9} \therefore\hspace{5pt} h_{k,m} &amp;= \frac{\sum_n y_{k,n}w_{m,n}}{\sum_n w_{m,n}^2/\lambda_{k,m,n}}
+\end{aligned}
+$$</p>
+<p>$w_{m,n}$ についても同様にして以下の通り求まる。</p>
+<p>$$
+\tag{10} w_{m,n} = \frac{\sum_k y_{k,n}h_{k,m}}{\sum_k h_{k,m}^2/\lambda_{k,m,n}}
+$$</p>
+<p>以上より, (4) を (9) (10)に代入することで最終的に以下の更新式が導かれる。</p>
+<p>$$
+\tag{11} h_{k,m} \leftarrow h_{k,m} \frac{\sum_n y_{k,n} w_{m,n}}{\sum_n x_{k,n} w_{m,n}}
+$$</p>
+<p>$$
+\tag{12} w_{m,n} \leftarrow w_{m,n} \frac{\sum_k y_{k,n} h_{k,m}}{\sum_k x_{k,n} h_{k,m}}
+$$</p>
+<p>NMFのアルゴリズムはこの更新式が誤差関数を収束するまで計算することにより, 局所最適な $H, W$ を得ることができる。</p>
+<h1 id="nmf1">NMFを用いた決済分析</h1>
+<h2 id="heading3">前提</h2>
+<p>クレジットカードの決済データにはいつ, どの加盟店(店舗)で, いくらの決済を行ったかという情報が含まれている。利用される加盟店は多岐にわたり, 購買データの例のように ユーザ × 決済 の行列を作ると高次元かつスパースな行列となってしまい扱いが困難である。<br>
+ユーザの決済の目的 (食料品, ゲーム etc) はたとえ加盟店が異なっていたとしても一定の傾向 (共起) がみられると考え, NMFを用いることで加盟店の特徴 (基底) を抽出できるはずである。</p>
+<p>対象とするユーザは直近3ヶ月間に一定回数以上決済したユーザ ($N$人) とし, 加盟店は比較的利用の多い 300 加盟店をピックアップした。 ユーザ毎に利用頻度は異なるため加盟店決済回数を総決済回数で除した加盟店決済回数割合を用いている。対象とする行列 $X$ は,  $N \times 300$ となる。$(N\gg300)$</p>
+<h2 id="heading4">基底の数</h2>
+<p>NMFを適用するにあたり, まず基底の数を決める必要がある。基底の数を $K$ とすると, $K &lt; \min(N,300)$ としなければ行列分解の意味がない。上述したように元の行列より少ない基底の数で近似 (低ランク行列近似) することで潜在的な特徴を抽出することができるからだ。</p>
+<p>以下のグラフは基底の数 $K$ を動かしてNMFを適用し近似誤差をプロットしたものである。基底の数を増やせば増やすだけ誤差が減少していくが, あまり増やしすぎても細かいノイズまで学習してしまう恐れがあるのでここでは誤差の減少が比較的緩やかになる手前の $K=15$ とする。</p>
+<p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/error.png" alt="error"></p>
+<h2 id="pythonnmf">PythonによるNMFの実装</h2>
+<p>PythonによるNMFのコードは以下の通り数行で書ける。<br>
+行列の先頭部分を抜き出して $X \simeq WH$ となることを確認している。</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="kn">from</span> <span class="nn">sklearn.decomposition</span> <span class="kn">import</span> <span class="n">NMF</span>
+
+<span class="c1"># 基底数</span>
+<span class="n">k</span> <span class="o">=</span> <span class="mi">15</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">NMF</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="sa"></span><span class="s1">&#39;</span><span class="s1">random</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+
+<span class="c1"># X: 元の行列 ユーザ x 加盟店決済回数割合</span>
+<span class="c1"># W: 係数行列 ユーザ x 係数</span>
+<span class="c1"># H: 基底行列 基底ベクトル x 加盟店</span>
+<span class="n">W</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+<span class="n">H</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">components_</span>
+
+<span class="c1"># 元の行列 X</span>
+<span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="p">:</span><span class="mi">5</span><span class="p">,</span> <span class="p">:</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="p">)</span>
+<span class="c1"># [[0.12 0.   0.46 0.   0.05 0.   0.   0.   0.   0.  ]</span>
+<span class="c1">#  [0.27 0.4  0.   0.   0.   0.   0.   0.   0.   0.  ]</span>
+<span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.   0.71 0.  ]</span>
+<span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.59 0.   0.  ]</span>
+<span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.   0.   0.  ]]</span>
+
+<span class="c1"># 復元した行列 W x H</span>
+<span class="k">print</span><span class="p">(</span><span class="p">(</span><span class="n">W</span> <span class="err">@</span> <span class="n">H</span><span class="p">)</span><span class="p">[</span><span class="p">:</span><span class="mi">5</span><span class="p">,</span> <span class="p">:</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="p">)</span>
+<span class="c1"># [[0.12 0.   0.46 0.   0.05 0.   0.   0.   0.   0.  ]</span>
+<span class="c1">#  [0.27 0.4  0.   0.   0.   0.   0.   0.   0.   0.  ]</span>
+<span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.   0.7  0.  ]</span>
+<span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.59 0.   0.  ]</span>
+<span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.   0.   0.  ]]</span>
+</code></pre></div><h2 id="heading5">行列の可視化</h2>
+<h3 id="-w">係数行列 $W$</h3>
+<p>ランダムに 100 ユーザを選び, 横軸にユーザを縦軸に基底をとり可視化した。各ユーザに対して少数の基底で表現できていることが分かる。基底 6~9 の係数が大きいユーザが目立つがこれらの基底で表現される加盟店は全体の決済の中でも特に多く利用されている加盟店群である。<br>
+この行列はユーザの購買行動の特徴を捉えたベクトルと解釈することができるのでユーザ間の距離 (類似度) をとることで類似のユーザを抽出したり, クラスタリングに用いることができる。</p>
+<p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/user-basis.png" alt="user-basis"></p>
+<h3 id="-h">基底行列 $H$</h3>
+<p>同様にランダムに 100 個加盟店を選び, 横軸に加盟店を縦軸に基底をとり可視化した。こちらは係数行列 $W$ と比較するとやや密な行列となっている。</p>
+<p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/merchant-basis.png" alt="merchant-basis"></p>
+<p>上図では少し分かりづらいのでいくつかの加盟店をピックアップした。横軸が基底となっている。
+1つの基底で表現されているものもあれば複数の基底で表現されている加盟店もある。<br>
+基底8,9はスーパー/コンビニ系, 基底11,12はゲーム系, 基底14はフリマ/EC系の色が強いことが分かる。</p>
+<p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/basis-pickup.png" alt="basis-pickup"></p>
+<h2 id="heading6">各基底の上位加盟店</h2>
+<p>最後に基底ベクトルにのうち特徴が分かりやすく得られた6個の基底において重み付けの大きい加盟店上位を抽出した。それぞれの基底を解釈し意味付けしたものを表頭に示している。</p>
+<p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/top_feature_1.png" alt="top_feature_1">
+<img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/top_feature_2.png" alt="top_feature_2"></p>
+<p>今回は加盟店データの前処理を行わずにシンプルにNMFを適用しただけであるがそれなりに特徴を捉えられていることが分かる。</p>
+<p>しかしNMFは初期値によって結果が変わる可能性があり, 必ずしも大域的最適解を得られる保証はないので注意が必要である。
+そのため初期値を様々に変えて試してみるべきであるが近似誤差が最小になるからといって必ずしも望ましい結果が得られるわけではない。
+複数個得られた結果をアンサンブルするなどの工夫も必要かもしれない。</p>
+<p>また決済時に連携される加盟店名には同一店舗と推測されるが微妙に異なるケースが存在したり, チェーンだと〇〇店といった店舗名が末尾に含まれているケースがある。
+NMFによってある程度はそのような加盟店も同じ基底に押し込むことで同一のものと扱ってくれる場合もあるが事前に名寄せを行うことでより精度を上げられると思われる。</p>
+<h1 id="heading7">補足</h1>
+<h3 id="1-jensen-">[1] Jensen の不等式</h3>
+<p>関数 $f(x)$ を凸関数, $\alpha_1, \ldots, \alpha_n$ を $\sum_i \alpha_i = 1$ を満たす n 個の正の実数とするとき</p>
+<p>$$
+f(\sum_i \alpha_i x_i) \leq \sum_i \alpha f(x_i)
+$$</p>
+<p>が成り立ち, $x_1 = \cdots = x_n$ のとき等号が成立する。</p>
+<h3 id="2-">[2] 補助関数</h3>
+<p>$\theta = \{\theta_i\}_{1 \leq i \leq I}$ を変量とする目的関数 $D(\theta)$ に対し,</p>
+<p>$$
+D(\theta) = \min_{\overline{\theta}} G(\theta, \overline{\theta})
+$$</p>
+<p>が成り立つとき, $G(\theta, \overline\theta)$ を $D({\theta})$ の補助関数, $\overline\theta$ を補助変数と定義する</p>
+<p>$$
+\overline\theta \leftarrow \argmin_{\overline\theta} G(\theta, \overline{\theta})
+$$</p>
+<p>$$
+\theta_i \leftarrow \argmin_{\theta_i} G(\theta, \overline{\theta})
+$$</p>
+<p>を繰り返すことで目的関数 $D(\theta)$ は単調に減少する。<br>
+直接最小化が困難な目的関数に対して上限となる補助関数を用意し, この補助関数を最小化することによって間接的に目的関数を最小化することができる。</p>
+<h1 id="heading8">参考文献</h1>
+<p>[1] Daniel D. Lee, H. Sebastian Seung <a href="https://papers.nips.cc/paper/1861-algorithms-for-non-negative-matrix-factorization.pdf">Algorithms for Non-negative Matrix Factorization</a><br>
+[2] 亀岡弘和 <a href="http://www.kecl.ntt.co.jp/people/kameoka.hirokazu/publications/Kameoka2012SICE09published.pdf">非負値行列因子分解</a><br>
+[3] <a href="https://www.iwanami.co.jp/book/b280246.html">岩波データサイエンス Vol.5</a></p>
+
+		
+	</div>
+
+	<div class="pagination">
+
+		<a href="#" class="top">Top</a>
+	</div>
+</main>
+
+
+        		<footer>
+			<span>
+			&copy; <time datetime="2020-01-01 22:15:41.457993 &#43;0900 JST m=&#43;0.090981639">2020</time> yosukeyoshida. 
+			</span>
+		</footer>
+                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.1/dist/katex.min.css" integrity="sha384-dbVIfZGuN1Yq7/1Ocstc1lUEm+AT+/rCkibIcC/OmWo5f0EA48Vf8CytHzGrSwbQ" crossorigin="anonymous">
+                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.1/dist/katex.min.js" integrity="sha384-2BKqo+exmr9su6dir+qCw08N2ZKRucY4PrGQPPWU1A7FtlCGjmEGFqXCv5nyM5Ij" crossorigin="anonymous"></script>
+                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script>
+                <script>
+                    document.addEventListener("DOMContentLoaded", function() {
+                      renderMathInElement(document.body, {delimiters: [
+                        {left: "$$", right: "$$", display: true},
+                        {left: "$", right: "$", display: false}]
+                      });
+                    });
+                </script>
+
+    </body>
+</html>

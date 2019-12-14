@@ -1,0 +1,2 @@
+[publishdate]
+other = "{{ .PublishDate.Format \"January 2, 2006\" }}"
