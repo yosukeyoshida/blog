@@ -6,10 +6,17 @@
     <description>Recent content in Posts on yosukeyoshida</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>ja</language>
-    <lastBuildDate>Fri, 20 Dec 2019 00:00:00 +0900</lastBuildDate>
-    
-	<atom:link href="https://yosukeyoshida.netlify.com/posts/index.xml" rel="self" type="application/rss+xml" />
-    
+    <lastBuildDate>Wed, 25 Dec 2019 00:00:00 +0900</lastBuildDate><atom:link href="https://yosukeyoshida.netlify.com/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>ベイズ推論によるA/Bテストの効果検証入門</title>
+      <link>https://yosukeyoshida.netlify.com/posts/bayesian-ab-testing/</link>
+      <pubDate>Wed, 25 Dec 2019 00:00:00 +0900</pubDate>
+      
+      <guid>https://yosukeyoshida.netlify.com/posts/bayesian-ab-testing/</guid>
+      <description>&lt;p&gt;A/Bテストの効果検証では信頼区間を推定したり仮説検定を行ったりすることが多いと思います。しかしp値も信頼区間も直感的な解釈が難しく統計に詳しくない人からするととっつきづらかったります。&lt;br&gt;
+ベイズ統計のアプローチを使った場合, 未知のパラメータを確率変数と考えてその確率分布を観測データをもとに推定します。推定された確率分布を用いることでパラメータのばらつきを可視化したり, BよりAの方がCVRが高い確率といったようなものが求められます。
+これらの方法論を比較する為にいくつかA/Bテストをシミュレーションしてみました。&lt;/p&gt;</description>
+    </item>
     
     <item>
       <title>非負値行列因子分解を用いた決済分析</title>

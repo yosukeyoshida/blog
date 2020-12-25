@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="twitter:card" content="summary" />
+		<meta name="og:title" content="ベイズ推論によるA/Bテストの効果検証入門" />
+		<meta name="og:description" content="A/Bテストの効果検証では信頼区間を推定したり仮説検定を行ったりすることが多いと思います。しかしp値も信頼区間も直感的な解釈が難しく統計に詳しくない人からするととっつきづらかったります。
+ベイズ統計のアプローチを使った場合, 未知のパラメータを確率変数と考えてその確率分布を観測データをもとに推定します。推定された確率分布を用いることでパラメータのばらつきを可視化したり, BよりAの方がCVRが高い確率といったようなものが求められます。
+これらの方法論を比較する為にいくつかA/Bテストをシミュレーションしてみました。" />
+		<meta name="og:image" content="https://yosukeyoshida.netlify.com/images/eyecatch.png" />
+		<meta name="twitter:url" content="https://yosukeyoshida.netlify.com/posts/bayesian-ab-testing/" />
+
+		<title>ベイズ推論によるA/Bテストの効果検証入門 &middot; yosukeyoshida</title>
+
+		
+  		<link rel="stylesheet" href="/css/style.css">
+		<link rel="stylesheet" href="/css/fonts.css">
+		<link rel="stylesheet" href="/css/custom.css">
+		<link rel="stylesheet" href="/css/syntax.css">
+		
+		<link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+		<link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+		<link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+
+		
+		<link href="" rel="alternate" type="application/rss+xml" title="yosukeyoshida" />
+	</head>
+
+    <body>
+        		<nav class="nav">
+			<div class="nav-container">
+				<a href="/">
+					<h2 class="nav-title">yosukeyoshida</h2>
+				</a>
+				<ul>
+    
+    
+</ul>
+			</div>
+		</nav>
+
+        
+
+<main>
+	<div class="post">
+		<div class="post-info">
+    <span>Written by</span>
+        
+        <br>
+        <span>on&nbsp;</span><time datetime="2019-12-25 00:00:00 &#43;0900 JST">December 25, 2019</time>
+</div>
+		<h1 class="post-title">ベイズ推論によるA/Bテストの効果検証入門</h1>
+<div class="post-line"></div>
+
+		
+
+		<p>A/Bテストの効果検証では信頼区間を推定したり仮説検定を行ったりすることが多いと思います。しかしp値も信頼区間も直感的な解釈が難しく統計に詳しくない人からするととっつきづらかったります。<br>
+ベイズ統計のアプローチを使った場合, 未知のパラメータを確率変数と考えてその確率分布を観測データをもとに推定します。推定された確率分布を用いることでパラメータのばらつきを可視化したり, BよりAの方がCVRが高い確率といったようなものが求められます。
+これらの方法論を比較する為にいくつかA/Bテストをシミュレーションしてみました。</p>
+<p>この記事は <a href="https://adventar.org/calendars/5396">カンム Advent Calendar 2020</a> $25$日目の記事です。</p>
+<p>全てのコードは<a href="https://github.com/yosukeyoshida/bayesianAB/blob/main/ab_testing.ipynb">github</a>にあります。</p>
+<h1 id="ベイズ推論">ベイズ推論</h1>
+<p>ベイズ統計で重要なベイズの定理とそれを用いてどのように未知のパラメータを推論するか簡単に説明します。</p>
+<h2 id="ベイズの定理">ベイズの定理</h2>
+<p>観測されたデータを表す確率変数を $D$ とし未知のパラメータを表す確率変数を $\theta$ とするとベイズの定理は以下の式で表されます。</p>
+<p>$$
+P(\theta \mid D) = \frac{P(D \mid \theta)P(\theta)}{P(D)}
+$$</p>
+<p>$P(\theta \mid D)$ は事後分布と呼ばれデータ $D$ を観測した後のパラメータ $\theta$ の確率分布となります。
+$P(D\mid\theta)$ は尤度関数と呼ばれパラメータ $\theta$ を固定したときに観測されたデータが生じる確率を表します。
+$P(\theta)$ は事前分布と呼ばれデータ $D$ を観測する前のパラメータ $\theta$ の確率分布を表します。
+最後に $P(D)$ は周辺尤度と呼ばれ事後分布を積分した値が $1$ となるための正規化定数となります。<br>
+ベイズの定理を用いることで観測されたデータによって事前分布を事後分布に更新することができます。これをベイズ更新と呼びます。</p>
+<h2 id="ベイズ更新の例">ベイズ更新の例</h2>
+<p>コインを投げたときの表が出る確率分布について考えます。二値確率変数 $x \in \{0, 1\}$ において表を $x=1$, 裏を $x=0$ で表しコインの表が出る確率を $\theta$ とするとその確率分布は以下のようにベルヌーイ分布として表せます。
+$$
+Bern(x \mid \theta) = \theta^x(1 - \theta)^{1-x}
+$$</p>
+<p>事前分布を $[0, 1]$ の一様分布とし, 尤度関数をベルヌーイ分布として複数回コインを投げた後の事後分布をベイズ更新によって求めます。
+ここでは簡単にする為に $\theta$ を $[0, 1]$ の区間で離散化し積分をせずに事後確率を近似しています。</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">japanize_matplotlib</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+
+<span class="c1"># パラメータ</span>
+<span class="n">thetas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+
+<span class="c1"># 尤度関数</span>
+<span class="n">likelihood</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">thetas</span> <span class="k">if</span> <span class="n">x</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">thetas</span><span class="p">)</span>
+
+<span class="c1"># 事後分布</span>
+<span class="k">def</span> <span class="nf">posterior</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">prior</span><span class="p">):</span>
+    <span class="n">lp</span> <span class="o">=</span> <span class="n">likelihood</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="n">prior</span>
+    <span class="k">return</span> <span class="n">lp</span> <span class="o">/</span> <span class="n">lp</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="n">thetas</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&#34;&#34;</span><span class="p">,</span> <span class="n">ylim</span><span class="o">=</span><span class="mf">0.0022</span><span class="p">):</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">thetas</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">thetas</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&#34;#348ABD&#34;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="n">ylim</span><span class="p">])</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\theta$&#39;</span><span class="p">);</span>
+
+<span class="c1"># 事前分布</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">thetas</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">thetas</span><span class="p">])</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+<span class="n">plot</span><span class="p">(</span><span class="n">thetas</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&#34;事前分布&#34;</span><span class="p">)</span>
+
+<span class="c1"># コインが裏, 表, 表と出た</span>
+<span class="n">trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">trials</span><span class="p">):</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">posterior</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;表&#39;</span> <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="s1">&#39;裏&#39;</span>
+    <span class="n">plot</span><span class="p">(</span><span class="n">thetas</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">ax</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">],</span> <span class="n">f</span><span class="s2">&#34;{i+1}回目 {result}&#34;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s2">&#34;000.png&#34;</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&#34;tight&#34;</span><span class="p">)</span>
+
+<span class="c1"># 真の表が出る確率を0.5として追加で97回投げる</span>
+<span class="n">trials</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">bernoulli</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">97</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">trials</span><span class="p">):</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">posterior</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">plot</span><span class="p">(</span><span class="n">thetas</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="s2">&#34;100回目&#34;</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">)</span>
+</code></pre></div><p><img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/000.png" alt="000">
+左上はコインを投げる前の事前分布, 右上はコインを1回投げて裏だったときの事後分布となります。裏が1回観測されることにより $\theta$ が小さい確率が高くなっていることが分かります。
+2回目以降は前回の事後分布が事前分布となり逐次ベイズ更新によって事後分布が更新されていきます。2回目, 3回目は続けて表が出たときの事後分布を示しています。</p>
+<p>さらに$97$回コイン投げを行い合計100回ベイズ更新することで以下の事後分布が得られました。だいぶばらつきが小さくなりパラメータ $\theta$ がだいたいどの辺に存在する確率が高いか分かってきました。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/001.png" alt="001">
+このようにベイズ推論では観測されたデータをもとに未知のパラメータの確率分布を求めます。</p>
+<h1 id="abテストのシミュレーション">A/Bテストのシミュレーション</h1>
+<p>ECサイトにおいて商品を購入してもらう為に効果的な広告をA/Bテストで検証したいとします。
+広告A, Bの真のCVRをそれぞれ $0.05$, $0.04$ とします。当然これらのCVRは実際には知ることはできずABテストから推測したい真の値となります。</p>
+<p>まずA/Bテストを実施したと想定してユーザ数分のサンプルデータを生成します。
+先ほどのコイン投げの例と同様に商品購入を1, 非購入を0と表すとパラメータを真のCVRとしたベルヌーイ分布を用いてテスト用のサンプルデータを生成することができます。
+どちらの広告の対象ユーザ数も$1000$人とした場合以下のようになります。</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">scipy.stats</span> <span class="kn">as</span> <span class="nn">stats</span>
+<span class="kn">import</span> <span class="nn">pymc3</span> <span class="kn">as</span> <span class="nn">pm</span>
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="kn">as</span> <span class="nn">sns</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="s2">&#34;ignore&#34;</span><span class="p">)</span>
+
+<span class="c1"># 真のCVR</span>
+<span class="n">true_p_A</span> <span class="o">=</span> <span class="mf">0.05</span>
+<span class="n">true_p_B</span> <span class="o">=</span> <span class="mf">0.04</span>
+
+<span class="c1"># ユーザ数</span>
+<span class="n">N_A</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">N_B</span> <span class="o">=</span> <span class="mi">1000</span>
+
+<span class="c1"># サンプルデータ</span>
+<span class="n">sample_A</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">bernoulli</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">true_p_A</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">N_A</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1225</span><span class="p">)</span>
+<span class="n">sample_B</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">bernoulli</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">true_p_B</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">N_B</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">1226</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&#34;(A) 購入人数={sample_A.sum()} / 観測されたCVR={sample_A.sum() / len(sample_A)}&#34;</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&#34;(B) 購入人数={sample_B.sum()} / 観測されたCVR={sample_B.sum() / len(sample_B)}&#34;</span><span class="p">)</span>
+<span class="c1"># (A) 購入人数=57 / 観測されたCVR=0.057</span>
+<span class="c1"># (B) 購入人数=48 / 観測されたCVR=0.048</span>
+</code></pre></div><p>観測されたCVRはそれぞれ $0.057, 0.048$ となりどちらも真のCVRよりも高い結果となりました。これはたまたま観測された結果であり再度A/Bテストを行った場合は異なる結果となるでしょう。</p>
+<h2 id="ベイズ推論-1">ベイズ推論</h2>
+<p>今回はPyMC3を使ってCVRをベイズ推論します。PyMC3はPythonでベイズ統計モデリングを扱うことのできるフレームワークのひとつです。<br>
+事前分布として $[0, 1]$ の一様分布, 尤度関数としてベルヌーイ分布を指定します。
+A, BのCVRを$P_A$, $P_B$とし事後分布を求めそれらの差をdeltaとして計算します。</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="k">with</span> <span class="n">pm</span><span class="o">.</span><span class="n">Model</span><span class="p">()</span> <span class="k">as</span> <span class="n">model</span><span class="p">:</span>
+    <span class="c1"># 事前分布は一様分布</span>
+    <span class="n">p_A</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Uniform</span><span class="p">(</span><span class="s2">&#34;$p_A$&#34;</span><span class="p">,</span> <span class="n">lower</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">p_B</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Uniform</span><span class="p">(</span><span class="s2">&#34;$p_B$&#34;</span><span class="p">,</span> <span class="n">lower</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># AとBのCVRの差</span>
+    <span class="n">delta</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Deterministic</span><span class="p">(</span><span class="s2">&#34;delta&#34;</span><span class="p">,</span> <span class="n">p_A</span> <span class="o">-</span> <span class="n">p_B</span><span class="p">)</span>
+    <span class="c1"># 尤度関数はベルヌーイ分布</span>
+    <span class="n">obs_A</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Bernoulli</span><span class="p">(</span><span class="s2">&#34;obs_A&#34;</span><span class="p">,</span> <span class="n">p_A</span><span class="p">,</span> <span class="n">observed</span><span class="o">=</span><span class="n">sample_A</span><span class="p">)</span>
+    <span class="n">obs_B</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">Bernoulli</span><span class="p">(</span><span class="s2">&#34;obs_B&#34;</span><span class="p">,</span> <span class="n">p_B</span><span class="p">,</span> <span class="n">observed</span><span class="o">=</span><span class="n">sample_B</span><span class="p">)</span>
+    <span class="c1"># 事後分布をサンプリング</span>
+    <span class="n">trace</span> <span class="o">=</span> <span class="n">pm</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">20000</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="c1"># プロットのコードは省略</span>
+</code></pre></div><p>$P_A$, $P_B$の事後分布は以下のようになりました。グラフの下部に示された区間は$95$%HDI (highest density interval) と呼ばれ確率密度の高いものから順に確率が$0.95$を占めるまでの区間を取ったものです。<br>
+観測されたデータから$P_A$は$[0.044, 0.072]$の区間に, $P_B$は$[0.036, 0.063]$の区間に真の値が存在する可能性が高いと解釈されます。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/002.png" alt="002"></p>
+<p>$P_A$と$P_B$の事後分布を重ねてプロットしてみると分布のばらつきが大きく重なりが大きいように思います。もう少しA/Bテストを継続した方が良さそうですがこれだけを見ても判断が難しいですね。
+追ってサンプルサイズを変えて検証してみたいと思います。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/004.png" alt="004"></p>
+<p>またdeltaはBよりもAのCVRがどの程度高いか差の分布となっています。$95$%HDIは$[-0.011, 0.029]$となっており推定された区間に0を含んでいるので差があるとはいえなさそうです。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/003.png" alt="003"></p>
+<p>deltaの分布において0より大きい部分の面積はBよりもAの方がCVRが高い確率と解釈することができます。
+充分に確率が高いといえる閾値は$0.95$に取られることが多く$0.814$ではそこまで確信を持ってAの方がCVRが高いとはいえなさそうですがこちらも追ってもう少し詳しくみてみます。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/005.png" alt="005"></p>
+<h2 id="仮説検定">仮説検定</h2>
+<p>比較のためにRで母比率の差の検定をしてみたところp値は$0.3669$, 信頼区間は$[-0.01054537, 0.02854537]$となり有意ではない結果となりました。
+deltaのHDIと信頼区間はほぼ同じ区間を推定しています。</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="o">&gt;</span> <span class="n">prop</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="n">c</span><span class="p">(</span><span class="mi">57</span><span class="p">,</span> <span class="mi">48</span><span class="p">),</span> <span class="n">c</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">),</span> <span class="n">correct</span><span class="o">=</span><span class="n">F</span><span class="p">)</span>
+
+	<span class="mi">2</span><span class="o">-</span><span class="n">sample</span> <span class="n">test</span> <span class="k">for</span> <span class="n">equality</span> <span class="n">of</span> <span class="n">proportions</span> <span class="n">without</span> <span class="n">continuity</span>
+	<span class="n">correction</span>
+
+<span class="n">data</span><span class="p">:</span>  <span class="n">c</span><span class="p">(</span><span class="mi">57</span><span class="p">,</span> <span class="mi">48</span><span class="p">)</span> <span class="n">out</span> <span class="n">of</span> <span class="n">c</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+<span class="n">X</span><span class="o">-</span><span class="n">squared</span> <span class="o">=</span> <span class="mf">0.81417</span><span class="p">,</span> <span class="n">df</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">p</span><span class="o">-</span><span class="n">value</span> <span class="o">=</span> <span class="mf">0.3669</span>
+<span class="n">alternative</span> <span class="n">hypothesis</span><span class="p">:</span> <span class="n">two</span><span class="o">.</span><span class="n">sided</span>
+<span class="mi">95</span> <span class="n">percent</span> <span class="n">confidence</span> <span class="n">interval</span><span class="p">:</span>
+ <span class="o">-</span><span class="mf">0.01054537</span>  <span class="mf">0.02854537</span>
+<span class="n">sample</span> <span class="n">estimates</span><span class="p">:</span>
+<span class="n">prop</span> <span class="mi">1</span> <span class="n">prop</span> <span class="mi">2</span>
+ <span class="mf">0.057</span>  <span class="mf">0.048</span>
+</code></pre></div><h2 id="異なるサンプルサイズでの検証">異なるサンプルサイズでの検証</h2>
+<p>1000人ずつではサンプルが少なそうであったのでもう少しユーザ数を増やしてみます。サンプルが増えるにつれて事後分布のばらつきは小さくなり, より確信を持って区間推定ができている様子が伺えます。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/006.png" alt="006"></p>
+<p>横軸にユーザ数をとり, 縦軸に母比率の差の信頼区間とHDIをプロットしたものです。信頼区間もHDIもどちらもほぼ同じ区間を示しています。
+$3000$人を超えたあたりで信頼区間, HDIのどちらも下限が0を上回りはじめます。$6500$人を超えると確信を持って差があると判断ができそうです。区間推定の平均も0.01とほぼ真のCVRの差に漸近しています。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/007.png" alt="007"></p>
+<p>deltaの0より大きい部分の面積, つまりBよりもAのCVRの方が高い確率です。同様に$3000$人を超えたあたりで$0.95$を上回り, $6500$人を超えると安定して高い確率を示します。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/b8b24c4330c49bab4ed5a03572ebae214f4939d4/008.png" alt="008"></p>
+<p>ちなみにRで有意水準$5$%, 検出力を$80$%としたときに母比率の差の検定に必要なサンプルサイズを計算すると1郡あたり$6744$人必要となりました。
+上の結果からもそれだけのサンプルがあれば充分といえそうです。</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="o">&gt;</span> <span class="n">power</span><span class="o">.</span><span class="n">prop</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="n">p1</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">p2</span><span class="o">=</span><span class="mf">0.04</span><span class="p">,</span> <span class="n">sig</span><span class="o">.</span><span class="n">level</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">power</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+
+     <span class="n">Two</span><span class="o">-</span><span class="n">sample</span> <span class="n">comparison</span> <span class="n">of</span> <span class="n">proportions</span> <span class="n">power</span> <span class="n">calculation</span>
+
+              <span class="n">n</span> <span class="o">=</span> <span class="mf">6744.933</span>
+             <span class="n">p1</span> <span class="o">=</span> <span class="mf">0.05</span>
+             <span class="n">p2</span> <span class="o">=</span> <span class="mf">0.04</span>
+      <span class="n">sig</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="mf">0.05</span>
+          <span class="n">power</span> <span class="o">=</span> <span class="mf">0.8</span>
+    <span class="n">alternative</span> <span class="o">=</span> <span class="n">two</span><span class="o">.</span><span class="n">sided</span>
+
+<span class="n">NOTE</span><span class="p">:</span> <span class="n">n</span> <span class="ow">is</span> <span class="n">number</span> <span class="ow">in</span> <span class="o">*</span><span class="n">each</span><span class="o">*</span> <span class="n">group</span>
+</code></pre></div><h2 id="abテストの早期終了による問題">A/Bテストの早期終了による問題</h2>
+<p>頻度論における仮説検定では事前にサンプルサイズを見積もり, そのサイズに達するまではA/Bテストを終了すべきではないとされています。
+それは早期に終了してしまうと本当は差がないのに差があるという間違った判断(偽陽性)をしてしまうことがあるからです。</p>
+<p>AとBの真のCVRをどちらも$0.05$で差がないとした場合に同様のA/Bテストを行ってシミュレーションしてみました。
+ユーザ数が$3000$人のあたりで有意であるか際どいラインになっています。BよりもAのCVRが高い確率も同様に$0.95$まで到達しています。<br>
+このタイミングでA/Bテストを打ち切ってAの方が効果的であると判断した場合, 本当は差がないのに誤って判断することになります。
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/5f8ad40fb1d203fedeb763f6944d1546f0b8ef74/009.png" alt="009">
+<img src="https://gist.githubusercontent.com/yosukeyoshida/d9eab0f145b18066a4a41af492573a04/raw/5f8ad40fb1d203fedeb763f6944d1546f0b8ef74/010.png" alt="010"></p>
+<p>慎重に判断すべき問題であればやはり事前にサンプルサイズを見積もって仮説検定にもっていくのがよいのでしょう。
+しかし偽陽性を最小限に抑えようとすると時間もかかり必要となるサンプルサイズも大きくなります。扱っている対象によっては精度よりも速度を優先して改善を回していきたいというケースもあります。</p>
+<p>ベイズ推論では事後分布を具体的に求めることができるというメリットがあります。
+事後分布を用いることで誤った判断を下したときの損失を計算することができます。
+A, Bのどちらを採用するかを$x$とし, 損失関数を $L(p_A, p_B, x)$ と定義すると以下のように期待損失が計算できるのでこの期待損失が閾値を下回った場合にA/Bテストを停止するというものです。(参考[1])</p>
+<p>$$
+E[L](x) = \int_A \int_B L(p_A, p_B, x)f(p_A, p_B)dp_Adp_B
+$$</p>
+<p>偽陽性はある程度許容するかわりに損失をコントロールすることで精度と速度のバランスを最適化することができる、のだと思います。
+本当は損失関数を用いたシミュレーションもやりたかったのですが発展課題としてまた改めてやります。</p>
+<h1 id="参考">参考</h1>
+<p>[1] <a href="https://towardsdatascience.com/exploring-bayesian-a-b-testing-with-simulations-7500b4fc55bc">Bayesian A/B testing — a practical exploration with simulations</a></p>
+
+		
+	</div>
+
+	<div class="pagination">
+		<a href="/posts/nmf/" class="left arrow">&#8592;</a>
+
+		<a href="#" class="top">Top</a>
+	</div>
+</main>
+
+
+        		<footer>
+			<span>
+			&copy; <time datetime="2020-12-25 13:34:24.663295 &#43;0900 JST m=&#43;0.104039524">2020</time> yosukeyoshida. Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
+			</span>
+		</footer>
+                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.1/dist/katex.min.css" integrity="sha384-dbVIfZGuN1Yq7/1Ocstc1lUEm+AT+/rCkibIcC/OmWo5f0EA48Vf8CytHzGrSwbQ" crossorigin="anonymous">
+                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.1/dist/katex.min.js" integrity="sha384-2BKqo+exmr9su6dir+qCw08N2ZKRucY4PrGQPPWU1A7FtlCGjmEGFqXCv5nyM5Ij" crossorigin="anonymous"></script>
+                <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body);"></script>
+                <script>
+                    document.addEventListener("DOMContentLoaded", function() {
+                      renderMathInElement(document.body, {delimiters: [
+                        {left: "$$", right: "$$", display: true},
+                        {left: "$", right: "$", display: false}]
+                      });
+                    });
+                </script>
+
+    </body>
+</html>

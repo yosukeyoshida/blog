@@ -44,10 +44,10 @@
 <main>
 	<div class="post">
 		<div class="post-info">
-    <span></span>
+    <span>Written by</span>
         
         <br>
-        <span>&nbsp;</span><time datetime="2019-12-20 00:00:00 &#43;0900 JST">December 20, 2019</time>
+        <span>on&nbsp;</span><time datetime="2019-12-20 00:00:00 &#43;0900 JST">December 20, 2019</time>
 </div>
 		<h1 class="post-title">非負値行列因子分解を用いた決済分析</h1>
 <div class="post-line"></div>
@@ -57,10 +57,10 @@
 		<p>非負値行列因子分解 (non-negative matrix factorization; NMF) は, 非負値行列を非負値行列の積に分解するという数学的にはシンプルでありながらその応用範囲は画像や文書, 信号処理と幅広く適用できることで知られ, 次元削減やクラスタリング, レコメンデーションに活用することができる。<br>
 はじめに NMF の理論について簡単に説明した後, 実際の決済データに対してNMFを適用してみる。</p>
 <p>この記事は <a href="https://adventar.org/calendars/4386">カンム Advent Calendar 2019</a> 20日目の記事です。</p>
-<h1 id="heading">行列分解</h1>
+<h1 id="行列分解">行列分解</h1>
 <p>任意の行列を複数の行列の積に分解することを行列分解と呼ぶ。行列分解には様々な手法があり, 特異値分解やそれを利用した主成分分析がよく知られている。<br>
 行列を分解をすることで何が嬉しいのか。以下簡単な例で説明する。</p>
-<h2 id="heading1">購買データの例</h2>
+<h2 id="購買データの例">購買データの例</h2>
 <p>行列 $X$ はスーパーで4人の客が5種類の商品 {にんじん, たまねぎ, じゃがいも, みかん, りんご} のうち何を購入したか示すデータである。行列 $X$ の各行が客に対応し, 各列が購入した商品に対応している。
 例えば1人目の客は {にんじん, たまねぎ} を購入し, 3人目の客は {みかん, りんご} を購入している。</p>
 <p>$$
@@ -95,7 +95,7 @@ $$</p>
 <div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
 
 <span class="c1"># 元の行列 X</span>
-<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="p">[</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="p">,</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="p">,</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="p">,</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="p">]</span><span class="p">)</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]])</span>
 <span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
 <span class="c1"># [[1 1 0 0 0]</span>
 <span class="c1">#  [1 0 1 0 0]</span>
@@ -106,12 +106,12 @@ $$</p>
 <span class="n">u</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">vh</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">full_matrices</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
 <span class="n">w</span> <span class="o">=</span> <span class="n">u</span>
 <span class="n">h</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="err">@</span> <span class="n">vh</span><span class="p">)</span>
-<span class="k">print</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="c1"># [[ 0.71  0.   -0.71  0.  ]</span>
 <span class="c1">#  [ 0.71  0.    0.71  0.  ]</span>
 <span class="c1">#  [ 0.    0.85  0.   -0.53]</span>
 <span class="c1">#  [ 0.    0.53  0.    0.85]]</span>
-<span class="k">print</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="c1"># [[ 1.41  0.71  0.71  0.    0.  ]</span>
 <span class="c1">#  [ 0.   -0.   -0.    0.85  1.38]</span>
 <span class="c1">#  [ 0.   -0.71  0.71  0.    0.  ]</span>
@@ -152,10 +152,10 @@ $$</p>
 $$</p>
 <p>掛け合わされた行列を見ると1,2番目の客は野菜を購入した客, 3,4番目の客は果物を購入した客という元の行列 $X$ の構造が復元されていることがわかる。<br>
 これは5次元の商品の要素で客の購買データを表現していたものを2次元の特徴で捉えられるように次元削減していることになる。商品の細かい違いは無視して野菜や果物を購入する客という潜在的な情報を抽出している。</p>
-<h1 id="heading2">非負値行列因子分解</h1>
+<h1 id="非負値行列因子分解">非負値行列因子分解</h1>
 <p>非負値行列因子分解 (non-negative matrix factorization; NMF) は, 行列分解において非負値の制約を入れたものである。実世界では非負値となるデータが多く, 非負値を構成する要素もまた非負値であるべきという考えに基づいている。さきほどの購買データにおいて野菜の基底に対する係数が負であるというのは不自然であり解釈が難しい。<br>
 また非負値制約の副次的な効果として分割した行列がスパース (疎) となりやすく, 個々のデータを少数の基底ベクトルで近似できるようになる。</p>
-<h2 id="nmf">NMFのアルゴリズム</h2>
+<h2 id="nmfのアルゴリズム">NMFのアルゴリズム</h2>
 <p>NMF では非負値行列を2つの非負値行列の積に分解する。これは非負値制約のもとで元の行列と分解された行列の積による近似誤差を目的関数として最小化する非線形の最適化問題になる。</p>
 <p>いま $N$ 個の非負値 K 次元データベクトルを $y_1, y_2,\ldots, y_N$ とし, 基底ベクトルを $h_1, h_2,\ldots, h_M$, 結合係数を $w_{1,n},\ldots,w_{m,n}$ とした場合に以下のように近似したい。</p>
 <p>$$
@@ -224,23 +224,23 @@ $$</p>
 \tag{12} w_{m,n} \leftarrow w_{m,n} \frac{\sum_k y_{k,n} h_{k,m}}{\sum_k x_{k,n} h_{k,m}}
 $$</p>
 <p>NMFのアルゴリズムはこの更新式が誤差関数を収束するまで計算することにより, 局所最適な $H, W$ を得ることができる。</p>
-<h1 id="nmf1">NMFを用いた決済分析</h1>
-<h2 id="heading3">前提</h2>
+<h1 id="nmfを用いた決済分析">NMFを用いた決済分析</h1>
+<h2 id="前提">前提</h2>
 <p>クレジットカードの決済データにはいつ, どの加盟店(店舗)で, いくらの決済を行ったかという情報が含まれている。利用される加盟店は多岐にわたり, 購買データの例のように ユーザ × 決済 の行列を作ると高次元かつスパースな行列となってしまい扱いが困難である。<br>
 ユーザの決済の目的 (食料品, ゲーム etc) はたとえ加盟店が異なっていたとしても一定の傾向 (共起) がみられると考え, NMFを用いることで加盟店の特徴 (基底) を抽出できるはずである。</p>
 <p>対象とするユーザは直近3ヶ月間に一定回数以上決済したユーザ ($N$人) とし, 加盟店は比較的利用の多い 300 加盟店をピックアップした。 ユーザ毎に利用頻度は異なるため加盟店決済回数を総決済回数で除した加盟店決済回数割合を用いている。対象とする行列 $X$ は,  $N \times 300$ となる。$(N\gg300)$</p>
-<h2 id="heading4">基底の数</h2>
+<h2 id="基底の数">基底の数</h2>
 <p>NMFを適用するにあたり, まず基底の数を決める必要がある。基底の数を $K$ とすると, $K &lt; \min(N,300)$ としなければ行列分解の意味がない。上述したように元の行列より少ない基底の数で近似 (低ランク行列近似) することで潜在的な特徴を抽出することができるからだ。</p>
 <p>以下のグラフは基底の数 $K$ を動かしてNMFを適用し近似誤差をプロットしたものである。基底の数を増やせば増やすだけ誤差が減少していくが, あまり増やしすぎても細かいノイズまで学習してしまう恐れがあるのでここでは誤差の減少が比較的緩やかになる手前の $K=15$ とする。</p>
 <p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/error.png" alt="error"></p>
-<h2 id="pythonnmf">PythonによるNMFの実装</h2>
+<h2 id="pythonによるnmfの実装">PythonによるNMFの実装</h2>
 <p>PythonによるNMFのコードは以下の通り数行で書ける。<br>
 行列の先頭部分を抜き出して $X \simeq WH$ となることを確認している。</p>
 <div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="kn">from</span> <span class="nn">sklearn.decomposition</span> <span class="kn">import</span> <span class="n">NMF</span>
 
 <span class="c1"># 基底数</span>
 <span class="n">k</span> <span class="o">=</span> <span class="mi">15</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">NMF</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="sa"></span><span class="s1">&#39;</span><span class="s1">random</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">NMF</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="s1">&#39;random&#39;</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 
 <span class="c1"># X: 元の行列 ユーザ x 加盟店決済回数割合</span>
 <span class="c1"># W: 係数行列 ユーザ x 係数</span>
@@ -249,7 +249,7 @@ $$</p>
 <span class="n">H</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">components_</span>
 
 <span class="c1"># 元の行列 X</span>
-<span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="p">:</span><span class="mi">5</span><span class="p">,</span> <span class="p">:</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="p">[:</span><span class="mi">5</span><span class="p">,</span> <span class="p">:</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="c1"># [[0.12 0.   0.46 0.   0.05 0.   0.   0.   0.   0.  ]</span>
 <span class="c1">#  [0.27 0.4  0.   0.   0.   0.   0.   0.   0.   0.  ]</span>
 <span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.   0.71 0.  ]</span>
@@ -257,25 +257,25 @@ $$</p>
 <span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.   0.   0.  ]]</span>
 
 <span class="c1"># 復元した行列 W x H</span>
-<span class="k">print</span><span class="p">(</span><span class="p">(</span><span class="n">W</span> <span class="err">@</span> <span class="n">H</span><span class="p">)</span><span class="p">[</span><span class="p">:</span><span class="mi">5</span><span class="p">,</span> <span class="p">:</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="p">)</span>
+<span class="k">print</span><span class="p">((</span><span class="n">W</span> <span class="err">@</span> <span class="n">H</span><span class="p">)[:</span><span class="mi">5</span><span class="p">,</span> <span class="p">:</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="c1"># [[0.12 0.   0.46 0.   0.05 0.   0.   0.   0.   0.  ]</span>
 <span class="c1">#  [0.27 0.4  0.   0.   0.   0.   0.   0.   0.   0.  ]</span>
 <span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.   0.7  0.  ]</span>
 <span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.59 0.   0.  ]</span>
 <span class="c1">#  [0.   0.   0.   0.   0.   0.   0.   0.   0.   0.  ]]</span>
-</code></pre></div><h2 id="heading5">行列の可視化</h2>
-<h3 id="-w">係数行列 $W$</h3>
+</code></pre></div><h2 id="行列の可視化">行列の可視化</h2>
+<h3 id="係数行列-w">係数行列 $W$</h3>
 <p>ランダムに 100 ユーザを選び, 横軸にユーザを縦軸に基底をとり可視化した。各ユーザに対して少数の基底で表現できていることが分かる。基底 6~9 の係数が大きいユーザが目立つがこれらの基底で表現される加盟店は全体の決済の中でも特に多く利用されている加盟店群である。<br>
 この行列はユーザの購買行動の特徴を捉えたベクトルと解釈することができるのでユーザ間の距離 (類似度) をとることで類似のユーザを抽出したり, クラスタリングに用いることができる。</p>
 <p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/user-basis.png" alt="user-basis"></p>
-<h3 id="-h">基底行列 $H$</h3>
+<h3 id="基底行列-h">基底行列 $H$</h3>
 <p>同様にランダムに 100 個加盟店を選び, 横軸に加盟店を縦軸に基底をとり可視化した。こちらは係数行列 $W$ と比較するとやや密な行列となっている。</p>
 <p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/merchant-basis.png" alt="merchant-basis"></p>
 <p>上図では少し分かりづらいのでいくつかの加盟店をピックアップした。横軸が基底となっている。
 1つの基底で表現されているものもあれば複数の基底で表現されている加盟店もある。<br>
 基底8,9はスーパー/コンビニ系, 基底11,12はゲーム系, 基底14はフリマ/EC系の色が強いことが分かる。</p>
 <p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/basis-pickup.png" alt="basis-pickup"></p>
-<h2 id="heading6">各基底の上位加盟店</h2>
+<h2 id="各基底の上位加盟店">各基底の上位加盟店</h2>
 <p>最後に基底ベクトルにのうち特徴が分かりやすく得られた6個の基底において重み付けの大きい加盟店上位を抽出した。それぞれの基底を解釈し意味付けしたものを表頭に示している。</p>
 <p><img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/top_feature_1.png" alt="top_feature_1">
 <img src="https://gist.githubusercontent.com/yosukeyoshida/6155df207edabe899c44ce67169a3244/raw/487ec2deb8925ed9094722d54a2c2f01dffe6850/top_feature_2.png" alt="top_feature_2"></p>
@@ -285,14 +285,14 @@ $$</p>
 複数個得られた結果をアンサンブルするなどの工夫も必要かもしれない。</p>
 <p>また決済時に連携される加盟店名には同一店舗と推測されるが微妙に異なるケースが存在したり, チェーンだと〇〇店といった店舗名が末尾に含まれているケースがある。
 NMFによってある程度はそのような加盟店も同じ基底に押し込むことで同一のものと扱ってくれる場合もあるが事前に名寄せを行うことでより精度を上げられると思われる。</p>
-<h1 id="heading7">補足</h1>
-<h3 id="1-jensen-">[1] Jensen の不等式</h3>
+<h1 id="補足">補足</h1>
+<h3 id="1-jensen-の不等式">[1] Jensen の不等式</h3>
 <p>関数 $f(x)$ を凸関数, $\alpha_1, \ldots, \alpha_n$ を $\sum_i \alpha_i = 1$ を満たす n 個の正の実数とするとき</p>
 <p>$$
 f(\sum_i \alpha_i x_i) \leq \sum_i \alpha f(x_i)
 $$</p>
 <p>が成り立ち, $x_1 = \cdots = x_n$ のとき等号が成立する。</p>
-<h3 id="2-">[2] 補助関数</h3>
+<h3 id="2-補助関数">[2] 補助関数</h3>
 <p>$\theta = \{\theta_i\}_{1 \leq i \leq I}$ を変量とする目的関数 $D(\theta)$ に対し,</p>
 <p>$$
 D(\theta) = \min_{\overline{\theta}} G(\theta, \overline{\theta})
@@ -306,7 +306,7 @@ $$</p>
 $$</p>
 <p>を繰り返すことで目的関数 $D(\theta)$ は単調に減少する。<br>
 直接最小化が困難な目的関数に対して上限となる補助関数を用意し, この補助関数を最小化することによって間接的に目的関数を最小化することができる。</p>
-<h1 id="heading8">参考文献</h1>
+<h1 id="参考文献">参考文献</h1>
 <p>[1] Daniel D. Lee, H. Sebastian Seung <a href="https://papers.nips.cc/paper/1861-algorithms-for-non-negative-matrix-factorization.pdf">Algorithms for Non-negative Matrix Factorization</a><br>
 [2] 亀岡弘和 <a href="http://www.kecl.ntt.co.jp/people/kameoka.hirokazu/publications/Kameoka2012SICE09published.pdf">非負値行列因子分解</a><br>
 [3] <a href="https://www.iwanami.co.jp/book/b280246.html">岩波データサイエンス Vol.5</a></p>
@@ -315,6 +315,7 @@ $$</p>
 	</div>
 
 	<div class="pagination">
+		<a href="/posts/bayesian-ab-testing/" class="right arrow">&#8594;</a>
 
 		<a href="#" class="top">Top</a>
 	</div>
@@ -323,7 +324,7 @@ $$</p>
 
         		<footer>
 			<span>
-			&copy; <time datetime="2020-01-01 22:15:41.457993 &#43;0900 JST m=&#43;0.090981639">2020</time> yosukeyoshida. 
+			&copy; <time datetime="2020-12-25 13:34:24.662703 &#43;0900 JST m=&#43;0.103448138">2020</time> yosukeyoshida. Made with <a href='https://gohugo.io'>Hugo</a> using the <a href='https://github.com/EmielH/tale-hugo/'>Tale</a> theme.
 			</span>
 		</footer>
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.1/dist/katex.min.css" integrity="sha384-dbVIfZGuN1Yq7/1Ocstc1lUEm+AT+/rCkibIcC/OmWo5f0EA48Vf8CytHzGrSwbQ" crossorigin="anonymous">
