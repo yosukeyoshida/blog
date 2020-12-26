@@ -77,7 +77,6 @@ for i, t in enumerate(trials):
     result = '表' if t == 1 else '裏'
     plot(thetas, p, ax[i+1], f"{i+1}回目 {result}")
 fig.tight_layout()
-fig.savefig("000.png", bbox_inches="tight")
 
 # 真の表が出る確率を0.5として追加で97回投げる
 trials = stats.bernoulli.rvs(0.5, size=97, random_state=42)
