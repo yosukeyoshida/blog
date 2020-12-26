@@ -6,11 +6,11 @@
     <description>Recent content on yosukeyoshida</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>ja</language>
-    <lastBuildDate>Wed, 25 Dec 2019 00:00:00 +0900</lastBuildDate><atom:link href="https://yosukeyoshida.netlify.com/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Fri, 25 Dec 2020 00:00:00 +0900</lastBuildDate><atom:link href="https://yosukeyoshida.netlify.com/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>ベイズ推論によるA/Bテストの効果検証入門</title>
       <link>https://yosukeyoshida.netlify.com/posts/bayesian-ab-testing/</link>
-      <pubDate>Wed, 25 Dec 2019 00:00:00 +0900</pubDate>
+      <pubDate>Fri, 25 Dec 2020 00:00:00 +0900</pubDate>
       
       <guid>https://yosukeyoshida.netlify.com/posts/bayesian-ab-testing/</guid>
       <description>&lt;p&gt;A/Bテストの効果検証では信頼区間を推定したり仮説検定を行ったりすることが多いと思います。しかしp値も信頼区間も直感的な解釈が難しく統計に詳しくない人からするととっつきづらかったります。&lt;br&gt;
